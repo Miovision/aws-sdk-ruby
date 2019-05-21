@@ -11,11 +11,12 @@ module Aws
       #   starting at this byte offset.
       # @option options [required,Integer] :size The maximum number of bytes to
       #   read from the `:offset`.
-      def initialize(options = {})
+      def initialize(options = {}, &block)
         @source = options[:source]
         @first_byte = options[:offset]
         @last_byte = @first_byte + options[:size]
         @size = options[:size]
+        @read_block = block
         @file = nil
       end
 

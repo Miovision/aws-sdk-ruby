@@ -35,13 +35,14 @@ module Aws
       # @param [String,Pathname,File,Tempfile] source
       # @option options [required,String] :bucket
       # @option options [required,String] :key
+      # @yieldparam [Integer] # of bytes read from disk during upload
       # @return [void]
-      def upload(source, options = {})
+      def upload(source, options = {}, &block)
         if File.size(source) < MIN_PART_SIZE
           raise ArgumentError, FILE_TOO_SMALL
         else
           upload_id = initiate_upload(options)
-          parts = upload_parts(upload_id, source, options)
+          parts = upload_parts(upload_id, source, options, &block)
           complete_upload(upload_id, parts, options)
         end
       end
@@ -60,10 +61,10 @@ module Aws
           multipart_upload: { parts: parts })
       end
 
-      def upload_parts(upload_id, source, options)
+      def upload_parts(upload_id, source, options, &block)
         pending = PartList.new(compute_parts(upload_id, source, options))
         completed = PartList.new
-        errors = upload_in_threads(pending, completed)
+        errors = upload_in_threads(pending, completed, &block)
         if errors.empty?
           completed.to_a.sort_by { |part| part[:part_number] }
         else
@@ -122,7 +123,7 @@ module Aws
         end
       end
 
-      def upload_in_threads(pending, completed)
+      def upload_in_threads(pending, completed, &block)
         threads = []
         @thread_count.times do
           thread = Thread.new do
@@ -130,10 +131,12 @@ module Aws
               while part = pending.shift
                 resp = @client.upload_part(part)
                 part[:body].close
+                yield(part[:body].size) if block
                 completed.push(etag: resp.etag, part_number: part[:part_number])
               end
               nil
             rescue => error
+              Rails.logger.error("code=multipart_upload_error error=#{error.message} backtrace=#{error.backtrace.join(",")}")
               # keep other threads from uploading other parts
               pending.clear!
               error

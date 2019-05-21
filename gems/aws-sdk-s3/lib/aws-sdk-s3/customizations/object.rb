@@ -300,12 +300,12 @@ module Aws
       # @return [Boolean] Returns `true` when the object is uploaded
       #   without any errors.
       #
-      def upload_file(source, options = {})
+      def upload_file(source, options = {}, &block)
         uploading_options = options.dup
         uploader = FileUploader.new(
           multipart_threshold: uploading_options.delete(:multipart_threshold),
           client: client)
-        uploader.upload(source, uploading_options.merge(bucket: bucket_name, key: key))
+        uploader.upload(source, uploading_options.merge(bucket: bucket_name, key: key), &block)
         true
       end
 

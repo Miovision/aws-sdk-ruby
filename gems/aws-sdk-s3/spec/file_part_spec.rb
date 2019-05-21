@@ -66,11 +66,21 @@ module Aws
 
       describe '#rewind' do
 
-        it 'allows the file part to be re-read' do
-          part = FilePart.new(source:path, offset:0, size:15)
-          expect(part.read).to eq('The quick brown')
-          part.rewind
-          expect(part.read).to eq('The quick brown')
+        describe 'with block' do
+          it 'yields the number of bytes read for a partial read' do
+            bytes_read = 0
+            read_block = ->(bytes) { bytes_read += bytes}
+            part = FilePart.new(source: path, offset: 0, size: 15, &read_block)
+            part.read(10)
+            expect(bytes_read).to eq(10)
+          end
+          it 'yields the remaining bytes read when # read called with num bytes past end' do
+            bytes_read = 0
+            read_block = ->(bytes) { bytes_read += bytes}
+            part = FilePart.new(source: path, offset: 0, size: 15, &read_block)
+            part.read(100)
+            expect(bytes_read).to eq(15)
+          end
         end
 
       end
