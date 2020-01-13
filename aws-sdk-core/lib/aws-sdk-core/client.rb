@@ -9,12 +9,17 @@ module Aws
       'Aws::Plugins::ParamConverter',
       'Aws::Plugins::ParamValidator',
       'Aws::Plugins::UserAgent',
+      'Aws::Plugins::HelpfulSocketErrors',
       'Aws::Plugins::RetryErrors',
       'Aws::Plugins::GlobalConfiguration',
       'Aws::Plugins::RegionalEndpoint',
       'Aws::Plugins::RequestSigner',
       'Aws::Plugins::ResponsePaging',
       'Aws::Plugins::StubResponses',
+      'Aws::Plugins::IdempotencyToken',
+      'Aws::Plugins::JsonvalueConverter',
+      'Aws::Plugins::EndpointDiscovery',
+      'Aws::Plugins::EndpointPattern'
     ]
 
     # @api private

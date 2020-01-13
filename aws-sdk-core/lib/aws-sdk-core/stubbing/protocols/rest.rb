@@ -40,12 +40,21 @@ module Aws
 
         def build_body(api, operation, data)
           rules = operation.output
-          if streaming?(rules)
+          if head_operation(operation)
+            ""
+          elsif streaming?(rules)
             data[rules[:payload]]
           elsif rules[:payload]
             body_for(api, operation, rules[:payload_member], data[rules[:payload]])
           else
-            body_for(api, operation, rules, data)
+            filtered = Seahorse::Model::Shapes::ShapeRef.new(
+              shape: Seahorse::Model::Shapes::StructureShape.new.tap do |s|
+                rules.shape.members.each do |member_name, member_ref|
+                  s.add_member(member_name, member_ref) if member_ref.location.nil?
+                end
+              end
+            )
+            body_for(api, operation, filtered, data)
           end
         end
 
@@ -59,6 +68,10 @@ module Aws
           else
             false
           end
+        end
+
+        def head_operation(operation)
+          operation.http_method == "HEAD"
         end
 
       end

@@ -4,7 +4,7 @@ module Aws
       class HasManyOperationDocumenter < BaseOperationDocumenter
 
         def docstring
-          super + ' ' +<<-DOCSTRING.lstrip
+          super + ' ' + <<-DOCSTRING.lstrip
 Returns a {Resources::Collection Collection} of {#{target_resource_class_name}}
 resources. No API requests are made until you call an enumerable method on the
 collection. {#{called_operation}} will be called multiple times until every
@@ -46,9 +46,11 @@ collection. {#{called_operation}} will be called multiple times until every
           example = []
           example << "@example Batch operations callable on the returned collection"
           target_resource_batch_operations.each do |name, operation|
-            example << ""
-            example << "  # calls Client##{operation.request.method_name} on each batch"
-            example << "  #{variable_name}.#{@operation_name}.#{name}"
+            if operation.respond_to?(:request)
+              example << ""
+              example << "  # calls Client##{operation.request.method_name} on each batch"
+              example << "  #{variable_name}.#{@operation_name}.#{name}"
+            end
           end
           tag(example.join("\n"))
         end

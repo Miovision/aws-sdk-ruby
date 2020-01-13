@@ -64,6 +64,10 @@ module Aws
             group = namespace::Group.new(id:'group-id')
             expect(group).to be_kind_of(Resource)
             expect(group.identifiers).to eq(id:'group-id')
+
+            expect do
+              namespace::User.new(name: nil)
+            end.to raise_error(ArgumentError, 'missing required option :name')
           end
 
           describe 'actions' do
@@ -876,6 +880,63 @@ module Aws
               ])
               expect(doo_dads.all?(&:data_loaded?))
               expect(thing.doo_dads.limit(3).map(&:identifiers)).to eq(doo_dads[0..2].map(&:identifiers))
+
+              # raise on collection construction with string args
+              expect {
+                thing.doo_dads('doo-dad-name')
+              }.to raise_error(ArgumentError, /expected Hash, got String/)
+
+              # raise on collection construction with wrong arity
+              expect {
+                thing.doo_dads(1,2,3)
+              }.to raise_error(ArgumentError, /wrong number of arguments/)
+            end
+
+            it 'does not attempt to enumerate non-pageable responses' do
+              definition['resources'] = {
+                'Thing' => {
+                  'identifiers' => [{ 'name' => 'Name' }],
+                  'shape' => 'ThingShape',
+                  'hasMany' => {
+                    'DooDads' => {
+                      'request' => { 'operation' => 'ListDooDads' },
+                      'resource' => {
+                        'type' => 'DooDad',
+                        'identifiers' => [
+                          {
+                            'target' => 'Name',
+                            'source' => 'response',
+                            'path' => 'DooDads[].Name'
+                          },
+                        ]
+                      }
+                    }
+                  }
+                },
+                'DooDad' => {
+                  'identifiers' => [
+                    { 'name' => 'Name' },
+                  ]
+                }
+              }
+              shapes['StringShape'] = { 'type' => 'string' }
+              shapes['ThingShape'] = {
+                'type' => 'structure',
+                'members' => {
+                  'Type' => { 'shape' => 'StringShape' }
+                }
+              }
+
+              api_model['operations']['ListDooDads'] = {}
+
+              apply_definition
+
+              allow(client).to receive(:list_doo_dads).and_return(
+                double('client-resp', data: {doo_dads:[]})
+              )
+
+              thing = namespace::Thing.new(name:'thing-name')
+              expect(thing.doo_dads.to_a).to eq([])
             end
 
           end
@@ -1105,6 +1166,31 @@ module Aws
               expect {
                 namespace::OtherThing.new.exists?
               }.to raise_error(NotImplementedError)
+            end
+
+            it 'passes additional params to the client' do
+              definition['resources'] = {
+                'Thing' => {
+                  'identifiers' => [{ 'name' => 'Name' }],
+                  'waiters' => {
+                    'Exists' => {
+                      'waiterName' => 'ThingExists',
+                      'params' => [
+                        { 'target' => 'ThingName', 'source' => 'identifier', 'name' => 'Name' }
+                      ]
+                    }
+                  }
+                }
+              }
+
+              expect(client).to receive(:wait_until).
+                with(:thing_exists, { thing_name: 'name', extra: 'param'}).
+                and_return(double('successful-response'))
+
+              apply_definition
+
+              thing = namespace::Thing.new('name')
+              expect(thing.exists?(extra: 'param')).to be(true)
             end
 
           end

@@ -5,6 +5,8 @@ module Aws
     module Docs
       class Builder
 
+        DOC_SRC = File.expand_path('../../../../../../doc-src/', __FILE__)
+
         def self.document(svc_module)
           new(svc_module).document
         end
@@ -15,6 +17,7 @@ module Aws
           @client_class = svc_module.const_get(:Client)
           @api = @client_class.api
           @full_name = @api.metadata['serviceFullName']
+          @uid = @api.metadata['uid']
           @error_names = @api.operations.map {|_,o| o.errors.map(&:shape).map(&:name) }
           @error_names = @error_names.flatten.uniq.sort
           @namespace = YARD::Registry['Aws']
@@ -37,8 +40,8 @@ module Aws
         end
 
         def service_docstring
-          path = "doc-src/services/#{@svc_name}/service.md"
-          path = 'doc-src/services/default/service.md' unless File.exist?(path)
+          path = "#{DOC_SRC}/services/#{@svc_name}/service.md"
+          path = "#{DOC_SRC}/services/default/service.md" unless File.exist?(path)
           template = read(path)
           svc_name = @svc_name
           api = @api
@@ -61,8 +64,8 @@ module Aws
         end
 
         def errors_docstring
-          path = "doc-src/services/#{@svc_name}/errors.md"
-          path = 'doc-src/services/default/errors.md' unless File.exist?(path)
+          path = "#{DOC_SRC}/services/#{@svc_name}/errors.md"
+          path = "#{DOC_SRC}/services/default/errors.md" unless File.exist?(path)
           template = read(path)
           svc_name = @svc_name
           api = @api
@@ -89,8 +92,8 @@ module Aws
         end
 
         def client_docstring
-          path = "doc-src/services/#{@svc_name}/client.md"
-          path = 'doc-src/services/default/client.md' unless File.exist?(path)
+          path = "#{DOC_SRC}/services/#{@svc_name}/client.md"
+          path = "#{DOC_SRC}/services/default/client.md" unless File.exist?(path)
           render(path)
         end
 
@@ -98,7 +101,7 @@ module Aws
           svc_name = @svc_name
           api = @api
           full_name = @full_name
-          ERB.new(File.read(path)).result(binding)
+          ERB.new(read(path)).result(binding)
         end
 
         def document_client_constructor(namespace)
@@ -111,9 +114,9 @@ module Aws
 
         def client_constructor_docstring
           <<-DOCS.strip
-  Constructs an API client.
-  #{client_constructor_options}
-  @return [#{@client_class.name}] Returns an API client.
+Constructs an API client.
+#{client_constructor_options}
+@return [#{@client_class.name}] Returns an API client.
           DOCS
         end
 
@@ -141,7 +144,7 @@ module Aws
         end
 
         def document_client_operation(namespace, method_name, operation)
-          documenter = OperationDocumenter.new(@svc_name, namespace)
+          documenter = OperationDocumenter.new(@svc_name, namespace, @uid)
           documenter.document(method_name, operation)
         end
 
@@ -158,17 +161,17 @@ module Aws
             w << "<tr><td><tt>:#{name}</tt></td><td>{##{operation}}</td><td>#{waiter.delay}</td><td>#{waiter.max_attempts}</td></tr>"
           end
           docstring = <<-DOCSTRING
-  Returns the list of supported waiters. The following table lists the supported
-  waiters and the client method they call:
-  <table>
-  <thead>
-  <tr><th>Waiter Name</th><th>Client Method</th><th>Default Delay:</th><th>Default Max Attempts:</th></tr>
-  </thead>
-  <tbody>
-  #{waiters}
-  </tbody>
-  </table>
-  @return [Array<Symbol>] the list of supported waiters.
+Returns the list of supported waiters. The following table lists the supported
+waiters and the client method they call:
+<table>
+<thead>
+<tr><th>Waiter Name</th><th>Client Method</th><th>Default Delay:</th><th>Default Max Attempts:</th></tr>
+</thead>
+<tbody>
+#{waiters}
+</tbody>
+</table>
+@return [Array<Symbol>] the list of supported waiters.
           DOCSTRING
           m = YARD::CodeObjects::MethodObject.new(yard_class, :waiter_names)
           m.scope = :instance

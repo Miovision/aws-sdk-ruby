@@ -11,6 +11,8 @@ module Aws
         secret_access_key: nil,
         session_token: nil,
         profile: nil,
+        instance_profile_credentials_timeout: 1,
+        instance_profile_credentials_retries: 0,
       )
     }
 
@@ -90,6 +92,26 @@ module Aws
       expect(credentials.credentials.session_token).to eq('TOKEN_0')
     end
 
+
+    it 'hydrates profile from ENV with AWS_PROFILE when available' do
+      mock_path = File.join(
+        File.dirname(__FILE__), '..', 'fixtures', 'credentials',
+        'mock_shared_credentials')
+      path = File.join('HOME', '.aws', 'credentials')
+      allow(Dir).to receive(:home).and_return('HOME')
+      allow(File).to receive(:exist?).with(path).and_return(true)
+      allow(File).to receive(:readable?).with(path).and_return(true)
+      allow(File).to receive(:read).with(path).and_return(File.read(mock_path))
+
+      env['AWS_PROFILE'] = 'fooprofile'
+      creds = CredentialProviderChain.new.resolve
+      expect(creds.profile_name).to eq('fooprofile')
+      expect(credentials.set?).to be(true)
+      expect(credentials.credentials.access_key_id).to eq('ACCESS_KEY_1')
+      expect(credentials.credentials.secret_access_key).to eq('SECRET_KEY_1')
+      expect(credentials.credentials.session_token).to eq('TOKEN_1')
+    end
+
     it 'hydrates credentials from the instance profile service' do
       path = '/latest/meta-data/iam/security-credentials/'
       resp = <<-JSON.strip
@@ -114,6 +136,14 @@ module Aws
       expect(credentials.session_token).to eq('token')
     end
 
+    describe 'with config set to nil' do
+      let(:config) { nil }
+
+      it 'defaults to nil' do
+        expect(credentials).to be(nil)
+      end
+
+    end
     describe 'with shared credentials' do
 
       let(:path) { File.join('HOME', '.aws', 'credentials') }

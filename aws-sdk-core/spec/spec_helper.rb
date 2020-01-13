@@ -15,15 +15,20 @@ SimpleCov.command_name('test:unit:aws-sdk-core')
 RSpec.configure do |config|
   config.before(:each) do
 
+    # Note that failure to do this could trigger ECS Credentials, which are
+    # gated by an environment variable
     stub_const('ENV', {})
 
     # disable loading credentials from shared file
     allow(Dir).to receive(:home).and_raise(ArgumentError)
 
     # disable instance profile credentials
+    token_path = '/latest/api/token'
     path = '/latest/meta-data/iam/security-credentials/'
     stub_request(:get, "http://169.254.169.254#{path}").to_raise(SocketError)
+    stub_request(:put, "http://169.254.169.254#{token_path}").to_raise(SocketError)
 
+    Aws.shared_config.fresh
   end
 end
 

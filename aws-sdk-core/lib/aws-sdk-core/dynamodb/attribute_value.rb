@@ -51,6 +51,7 @@ module Aws
         private
 
         def format_set(set)
+          return { es: [] } if set.empty?
           case set.first
           when String, Symbol then { ss: set.map(&:to_s) }
           when STRINGY_TEST then { ss: set.map(&:to_str) }
@@ -75,13 +76,14 @@ module Aws
             end
           when :l then value.map { |v| format(v) }
           when :s then value
-          when :n then BigDecimal.new(value)
+          when :n then BigDecimal(value)
           when :b then StringIO.new(value)
           when :null then nil
           when :bool then value
           when :ss then Set.new(value)
-          when :ns then Set.new(value.map { |n| BigDecimal.new(n) })
+          when :ns then Set.new(value.map { |n| BigDecimal(n) })
           when :bs then Set.new(value.map { |b| StringIO.new(b) })
+          when :es then Set.new
           else
             raise ArgumentError, "unhandled type #{type.inspect}"
           end

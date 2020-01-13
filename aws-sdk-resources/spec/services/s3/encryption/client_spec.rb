@@ -1,5 +1,6 @@
 require 'spec_helper'
 require 'base64'
+require 'openssl'
 
 module Aws
   module S3
@@ -118,10 +119,10 @@ module Aws
           describe '#put_object' do
 
             it 'encrypts the data client-side' do
-              stub_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key")
+              stub_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key")
               client.put_object(bucket:'bucket', key:'key', body:'secret')
               expect(
-                a_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key").with(
+                a_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key").with(
                   :body => encrypted_body,
                   :headers => {
                     'Content-Length' => '16',
@@ -138,25 +139,25 @@ module Aws
             end
 
             it 'encrypts an empty or missing body' do
-              stub_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key")
+              stub_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key")
               client.put_object(bucket:'bucket', key:'key') # body not set
               expect(
-                a_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key").
+                a_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key").
                   with(:body => /.{16}/)
               ).to have_been_made.once
             end
 
             it 'can store the encryption envelope in a separate object' do
 
-              stub_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key")
-              stub_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key.instruction")
+              stub_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key")
+              stub_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key.instruction")
 
               options[:envelope_location] = :instruction_file
               client.put_object(bucket:'bucket', key:'key', body:'secret')
 
               # first request stores the encryption materials in the instruction file
               expect(
-                a_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key.instruction").with(
+                a_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key.instruction").with(
                   :body => Json.dump(
                     'x-amz-key'=>'gX+a4JQYj7FP0y5TAAvxTz4e2l0DvOItbXByml/NPtKQcUlsoGHoYR/T0TuYHcNj',
                     'x-amz-iv' => 'TO5mQgtOzWkTfoX4RE5tsA==',
@@ -167,7 +168,7 @@ module Aws
 
               # second request stores teh encrypted object
               expect(
-                a_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key").with(
+                a_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key").with(
                   :body => encrypted_body,
                   :headers => {
                     'Content-Length' => '16',
@@ -179,8 +180,8 @@ module Aws
             end
 
             it 'accpets a custom instruction file suffix' do
-              req1 = stub_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key.envelope")
-              req2 = stub_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key")
+              req1 = stub_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key.envelope")
+              req2 = stub_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key")
 
               options[:envelope_location] = :instruction_file
               options[:instruction_file_suffix] = '.envelope'
@@ -191,10 +192,10 @@ module Aws
             end
 
             it 'moves the un-encrypted md5 to a new header' do
-              stub_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key")
+              stub_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key")
               client.put_object(bucket:'bucket', key:'key', body:'secret', content_md5: 'MD5')
               expect(
-                a_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key").with(
+                a_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key").with(
                   :body => encrypted_body,
                   :headers => {
                     'X-Amz-Meta-X-Amz-Unencrypted-Content-Md5' => 'MD5'
@@ -204,7 +205,7 @@ module Aws
             end
 
             it 'supports encryption with an asymmetric key pair' do
-              stub_request(:put, "https://bucket.s3-us-west-1.amazonaws.com/key")
+              stub_request(:put, "https://bucket.s3.us-west-1.amazonaws.com/key")
               options[:encryption_key] = OpenSSL::PKey::RSA.generate(1024)
               resp = client.put_object(bucket:'bucket', key:'key', body:'secret')
               expect(resp.context.http_request.body_contents).not_to eq('secret')
@@ -222,7 +223,7 @@ module Aws
           describe '#get_object' do
 
             def stub_encrypted_get(matdesc = '{}')
-              stub_request(:get, "https://bucket.s3-us-west-1.amazonaws.com/key").
+              stub_request(:get, "https://bucket.s3.us-west-1.amazonaws.com/key").
                 to_return(
                   body: encrypted_body,
                   headers: {
@@ -234,9 +235,9 @@ module Aws
             end
 
             def stub_encrypted_get_with_instruction_file(suffix = '.instruction')
-              stub_request(:get, "https://bucket.s3-us-west-1.amazonaws.com/key").
+              stub_request(:get, "https://bucket.s3.us-west-1.amazonaws.com/key").
                 to_return(body: encrypted_body)
-              stub_request(:get, "https://bucket.s3-us-west-1.amazonaws.com/key#{suffix}").
+              stub_request(:get, "https://bucket.s3.us-west-1.amazonaws.com/key#{suffix}").
                 to_return(
                   :body => Json.dump(
                     'x-amz-key'=>'gX+a4JQYj7FP0y5TAAvxTz4e2l0DvOItbXByml/NPtKQcUlsoGHoYR/T0TuYHcNj',
@@ -262,7 +263,7 @@ module Aws
             end
 
             it 'does not attempt to decrypt failed responses' do
-              stub_request(:get, "https://bucket.s3-us-west-1.amazonaws.com/key").
+              stub_request(:get, "https://bucket.s3.us-west-1.amazonaws.com/key").
                 to_return(status: 500)
               expect {
                 client.get_object(bucket:'bucket', key:'key')
@@ -317,11 +318,11 @@ module Aws
 
             it 'raises an error when materials can not be found' do
               stub_encrypted_get_with_instruction_file
-              stub_request(:get, "https://bucket.s3-us-west-1.amazonaws.com/key.instruction").
+              stub_request(:get, "https://bucket.s3.us-west-1.amazonaws.com/key.instruction").
                 to_return(status: 404)
               expect {
                 client.get_object(bucket:'bucket', key:'key')
-              }.to raise_error(Errors::DecryptionError, 'unable to locate encyrption envelope')
+              }.to raise_error(Errors::DecryptionError, 'unable to locate encryption envelope')
             end
 
             it 'resets the cipher during decryption on error' do
@@ -384,7 +385,7 @@ module Aws
           end
         end
 
-        describe 'kms' do
+        describe 'kms_CBC' do
 
           let(:kms_client) { KMS::Client.new(stub_responses:true) }
 
@@ -432,7 +433,7 @@ module Aws
             expect(Base64.encode64(resp.context.http_request.body_contents)).to eq("4FAj3kTOIisQ+9b8/kia8g==\n")
           end
 
-          it 'supports decryption via KMS' do
+          it 'supports decryption via KMS w/ CBC' do
             kms_client.stub_responses(:decrypt, plaintext: plaintext_object_key)
             client.client.stub_responses(:get_object, {
               body: Base64.decode64("4FAj3kTOIisQ+9b8/kia8g==\n"),
@@ -440,6 +441,61 @@ module Aws
             })
             resp = client.get_object(bucket:'aws-sdk', key:'foo')
             expect(resp.body.read).to eq('plain-text')
+          end
+
+        end
+
+        describe 'kms_GCM' do
+
+          let(:kms_client) { KMS::Client.new(stub_responses:true) }
+
+          let(:client) do
+            Encryption::Client.new({
+                                       kms_key_id: 'kms-key-id',
+                                       kms_client: kms_client,
+                                       stub_responses: true,
+                                   })
+          end
+
+          let(:headers) {{
+              "x-amz-meta-x-amz-wrap-alg" => "kms",
+              "x-amz-meta-x-amz-cek-alg" => "AES/GCM/NoPadding",
+              "x-amz-meta-x-amz-iv" => "XujE1oWCO83rw1PU",
+              "x-amz-meta-x-amz-key-v2" => Base64.strict_encode64("encrypted-object-key"),
+              "x-amz-meta-x-amz-matdesc" => "{\"kms_cmk_id\":\"kms-key-id\"}",
+              "x-amz-meta-x-amz-tag-len" => "128",
+              "content-length" => body.bytesize,
+          }}
+
+          let(:body) { Base64.decode64("ZpPUtKX0PPupGaE0o7FbJw2Ov53MXfqenLA=") }
+
+          let(:plaintext_object_key) {
+            "\xACb.\xEB\x16\x19(\x9AJ\xE0uCA\x034z\xF6&\x7F\x8E\x0E\xC0\xD5\x1A\x88\xAF2\xB1\xEEg#\x15"
+          }
+
+          if !ENV['TRAVIS']
+            it 'supports decryption via KMS w/ GCM' do
+              if !OpenSSL::Cipher.ciphers.include?('aes-256-gcm')
+                pending('aes-256-gcm not supported')
+              end
+              kms_client.stub_responses(:decrypt, plaintext: plaintext_object_key)
+              client.client.stub_responses(:get_object, [
+                # get_object resp
+                {
+                  status_code: 200,
+                  headers: headers,
+                  body: body,
+                },
+                # get_object w/range header resp
+                {
+                  status_code: 200,
+                  headers: headers.merge('content-length' => '16'),
+                  body: body.bytes.to_a[-16..-1].pack("C*"),
+                },
+              ])
+              resp = client.get_object(bucket:'aws-sdk', key:'foo')
+              expect(resp.body.read).to eq('plain-text')
+            end
           end
 
         end

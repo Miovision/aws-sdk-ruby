@@ -59,9 +59,15 @@ module Seahorse
       end
 
       # @api private
-      DynamicDefault = Struct.new(:block) do
-        def call(*args)
-          block.call(*args)
+      class DynamicDefault
+        attr_accessor :block
+
+        def initialize(block = nil)
+          @block = block
+        end
+
+        def call(*args) 
+          @block.call(*args)
         end
       end
 
@@ -98,7 +104,7 @@ module Seahorse
       #
       # @return [self]
       def add_option(name, default = nil, &block)
-        default = DynamicDefault.new(Proc.new) if block_given?
+        default = DynamicDefault.new(block) if block_given?
         @defaults[name.to_sym] << default
         self
       end
@@ -191,7 +197,13 @@ module Seahorse
 
         def value_at(opt_name)
           value = @struct[opt_name]
-          value.is_a?(Defaults) ? resolve_defaults(opt_name, value) : value
+          if value.is_a?(Defaults)
+            # this config value is used by endpoint discovery etc
+            @struct[:regional_endpoint] = true if opt_name == :endpoint
+            resolve_defaults(opt_name, value)
+          else
+            value
+          end
         end
 
         def resolve_defaults(opt_name, defaults)

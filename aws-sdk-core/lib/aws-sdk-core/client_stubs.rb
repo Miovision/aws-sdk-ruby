@@ -18,6 +18,19 @@ module Aws
         end
         @config.stub_responses = true
       end
+
+      # When a client is stubbed allow the user to access the requests made
+      @api_requests = []
+
+      requests = @api_requests
+      self.handle do |context|
+        requests << {
+          operation_name: context.operation_name,
+          params: context.params,
+          context: context
+        }
+        @handler.call(context)
+      end
     end
 
     # Configures what data / errors should be returned from the named operation
@@ -50,8 +63,18 @@ module Aws
     #       buckets: [{ name: 'my-bucket' }]
     #     })
     #
-    #     client.list_buckets.buckets.map(&:name) #=> ['my-bucket']
-    #     #=> ['aws-sdk']
+    #     client.list_buckets.buckets.map(&:name)
+    #     #=> ['my-bucket']
+    #
+    # With a Resource class {#stub_responses} on the corresponding client:
+    #
+    #     s3 = Aws::S3::Resource.new(stub_responses: true)
+    #     s3.client.stub_responses(:list_buckets, {
+    #       buckets: [{ name: 'my-bucket' }]
+    #     })
+    #
+    #     s3.buckets.map(&:name)
+    #     #=> ['my-bucket']
     #
     # Lastly, default stubs can be configured via `Aws.config`:
     #
@@ -63,6 +86,22 @@ module Aws
     #
     #     Aws::S3::Client.new.list_buckets.buckets.map(&:name)
     #     #=> ['my-bucket']
+    #
+    #     Aws::S3::Resource.new.buckets.map(&:name)
+    #     #=> ['my-bucket']
+    #
+    # ## Dynamic Stubbing
+    #
+    # In addition to creating static stubs, it's also possible to generate
+    # stubs dynamically based on the parameters with which operations were
+    # called, by passing a `Proc` object:
+    #
+    #     s3 = Aws::S3::Resource.new(stub_responses: true)
+    #     s3.client.stub_responses(:put_object, -> (context) {
+    #       s3.client.stub_responses(:get_object, content_type: context.params[:content_type])
+    #     })
+    #
+    # The yielded object is an instance of {Seahorse::Client::RequestContext}.
     #
     # ## Stubbing Errors
     #
@@ -141,6 +180,27 @@ module Aws
       end
     end
 
+    # Allows you to access all of the requests that the stubbed client has made
+    #
+    # @params [Boolean] exclude_presign Setting to true for filtering out not sent requests from
+    #                 generating presigned urls. Default to false.
+    # @return [Array] Returns an array of the api requests made, each request object contains the
+    #                 :operation_name, :params, and :context of the request. 
+    # @raise [NotImplementedError] Raises `NotImplementedError` when the client is not stubbed
+    def api_requests(options = {})
+      if config.stub_responses
+        if options[:exclude_presign]
+          @api_requests.reject {|req| req[:context][:presigned_url] }
+        else
+          @api_requests
+        end
+      else
+        msg = 'This method is only implemented for stubbed clients, and is '
+        msg << 'available when you enable stubbing in the constructor with `stub_responses: true`'
+        raise NotImplementedError.new(msg)
+      end
+    end
+
     # Generates and returns stubbed response data from the named operation.
     #
     #     s3 = Aws::S3::Client.new
@@ -164,9 +224,9 @@ module Aws
     end
 
     # @api private
-    def next_stub(operation_name)
-      operation_name = operation_name.to_sym
-      @stub_mutex.synchronize do
+    def next_stub(context)
+      operation_name = context.operation_name.to_sym
+      stub = @stub_mutex.synchronize do
         stubs = @stubs[operation_name] || []
         case stubs.length
         when 0 then default_stub(operation_name)
@@ -174,6 +234,7 @@ module Aws
         else stubs.shift
         end
       end
+      Proc === stub ? convert_stub(operation_name, stub.call(context)) : stub
     end
 
     private
@@ -190,13 +251,18 @@ module Aws
     def apply_stubs(operation_name, stubs)
       @stub_mutex.synchronize do
         @stubs[operation_name.to_sym] = stubs.map do |stub|
-          case stub
-          when Exception, Class then { error: stub }
-          when String then service_error_stub(stub)
-          when Hash then http_response_stub(operation_name, stub)
-          else { data: stub }
-          end
+          convert_stub(operation_name, stub)
         end
+      end
+    end
+
+    def convert_stub(operation_name, stub)
+      case stub
+      when Proc then stub
+      when Exception, Class then { error: stub }
+      when String then service_error_stub(stub)
+      when Hash then http_response_stub(operation_name, stub)
+      else { data: stub }
       end
     end
 

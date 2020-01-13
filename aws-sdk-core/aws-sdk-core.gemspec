@@ -13,7 +13,7 @@ Gem::Specification.new do |spec|
 
   spec.require_paths = ['lib']
 
-  spec.files = ['endpoints.json', 'ca-bundle.crt']
+  spec.files = ['endpoints.json', 'service-models.json', 'ca-bundle.crt']
   spec.files += Dir['lib/**/*.rb']
   spec.files += Dir['apis/**/**/*.json'].select { |p| !p.match(/\/docs/) }
 
@@ -21,5 +21,6 @@ Gem::Specification.new do |spec|
   spec.executables << 'aws.rb'
 
   spec.add_dependency('jmespath', '~> 1.0')
+  spec.add_dependency('aws-sigv4', '~> 1.0')
 
 end

@@ -37,6 +37,10 @@ module Aws
         CredentialProviderChain.new(config).resolve
       end
 
+      option(:instance_profile_credentials_retries, 0)
+
+      option(:instance_profile_credentials_timeout, 1)
+
       # Intentionally not documented - this should go away when all
       # services support signature version 4 in every region.
       option(:signature_version) do |cfg|
@@ -90,7 +94,7 @@ module Aws
           require_credentials(context)
           if signer = SIGNERS[context.config.signature_version]
             require_credentials(context)
-            signer.sign(context)
+            signer.sign(apply_authtype(context))
           end
         end
 
@@ -118,11 +122,27 @@ module Aws
           end
         end
 
+        def apply_authtype(context)
+          if context.operation['authtype'].eql?('v4-unsigned-body') &&
+            context.http_request.endpoint.scheme.eql?('https')
+            context.http_request.headers['X-Amz-Content-Sha256'] = 'UNSIGNED-PAYLOAD'
+          end
+          context
+        end
+
       end
 
       def add_handlers(handlers, config)
         # See the S3RequestSignerPlugin for Amazon S3 signature logic
-        handlers.add(Handler, step: :sign) unless config.sigv4_name == 's3'
+        unless config.sigv4_name == 's3'
+          operations = []
+          config.api.operation_names.each do |operation_name|
+            if config.api.operation(operation_name)['authtype'] != 'none'
+              operations << operation_name
+            end
+          end
+          handlers.add(Handler, step: :sign, operations: operations)
+        end
       end
 
     end

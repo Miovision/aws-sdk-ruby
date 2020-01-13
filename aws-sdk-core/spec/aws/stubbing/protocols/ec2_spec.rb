@@ -60,12 +60,10 @@ module Aws
             }
             resp = EC2.new.stub_data(api, operation, data)
             expect(normalize(resp.body.string)).to eq(normalize(<<-XML))
-              <DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2015-10-01/">
+              <DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
                   <requestId>stubbed-request-id</requestId>
                   <reservationSet>
                       <item>
-                          <reservationId>reservation-id</reservationId>
-                          <ownerId>owner-id</ownerId>
                           <groupSet>
                               <item>
                                   <groupName>group-name</groupName>
@@ -74,8 +72,8 @@ module Aws
                           </groupSet>
                           <instancesSet>
                               <item>
-                                  <instanceId>i-12345678</instanceId>
                                   <imageId>ami-12345678</imageId>
+                                  <instanceId>i-12345678</instanceId>
                                   <instanceState>
                                       <code>16</code>
                                       <name>running</name>
@@ -92,6 +90,8 @@ module Aws
                                   </tagSet>
                               </item>
                           </instancesSet>
+                          <ownerId>owner-id</ownerId>
+                          <reservationId>reservation-id</reservationId>
                       </item>
                   </reservationSet>
               </DescribeInstancesResponse>

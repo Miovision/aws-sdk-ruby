@@ -12,7 +12,8 @@ module Aws
 
         def call(context)
           require_credentials(context)
-          case context.config.signature_version
+          version = context.config.signature_version
+          case version
           when 'v4' then apply_v4_signature(context)
           when 's3' then apply_s3_legacy_signature(context)
           else
@@ -99,10 +100,8 @@ module Aws
         end
 
         def get_region_and_retry(context)
-          actual_region = region_from_body(context)
-          if actual_region.nil? || actual_region == ""
-            raise "Couldn't get region from body: #{context.body}"
-          end
+          actual_region = context.http_response.headers['x-amz-bucket-region']
+          actual_region ||= region_from_body(context.http_response.body_contents)
           update_bucket_cache(context, actual_region)
           log_warning(context, actual_region)
           update_region_header(context, actual_region)
@@ -115,7 +114,10 @@ module Aws
 
         def wrong_sigv4_region?(resp)
           resp.context.http_response.status_code == 400 &&
+          (
+            resp.context.http_response.headers['x-amz-bucket-region'] ||
             resp.context.http_response.body_contents.match(/<Region>.+?<\/Region>/)
+          )
         end
 
         def update_region_header(context, region)
@@ -127,8 +129,13 @@ module Aws
           signer.sign(context.http_request)
         end
 
-        def region_from_body(context)
-          context.http_response.body_contents.match(/<Region>(.+?)<\/Region>/)[1]
+        def region_from_body(body)
+          region = body.match(/<Region>(.+?)<\/Region>/)[1]
+          if region.nil? || region == ""
+            raise "couldn't get region from body: #{body}"
+          else
+            region
+          end
         end
 
         def log_warning(context, actual_region)

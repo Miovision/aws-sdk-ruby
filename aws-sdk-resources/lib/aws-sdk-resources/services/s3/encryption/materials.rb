@@ -33,7 +33,7 @@ module Aws
               key
             else
               msg = "invalid key, symmetric key required to be 16, 24, or "
-              msg << "32 bytes in length, saw length 31"
+              msg << "32 bytes in length, saw length " + key.bytesize.to_s
               raise ArgumentError, msg
             end
           else
@@ -47,7 +47,7 @@ module Aws
         def validate_desc(description)
           Json.load(description)
           description
-        rescue Json::ParseError
+        rescue Json::ParseError, EncodingError
           msg = "expected description to be a valid JSON document string"
           raise ArgumentError, msg
         end
