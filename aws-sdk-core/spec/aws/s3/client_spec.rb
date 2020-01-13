@@ -29,6 +29,28 @@ module Aws
         }.to raise_error(Aws::Errors::MissingCredentialsError)
       end
 
+      describe 'request ids' do
+
+        it 'populates request id and host id in the response context' do
+          s3 = Client.new(stub_responses: true)
+          s3.handle(step: :send) do |context|
+            context.http_response.signal_done(
+              status_code: 200,
+              headers: {
+                "x-amz-id-2" => "H0vUEO2f4PyWtNjgcb3TSdyHaie8j4IgnuKIW2rw0nS41rawnLDzkf+PKXmmt/uEi4bzvNMr72o=",
+                "x-amz-request-id"=> "BE9C18E622969B17"
+              },
+              body: ''
+            )
+            Seahorse::Client::Response.new(context: context)
+          end
+          resp = s3.list_buckets
+          expect(resp.context[:request_id]).to eq('BE9C18E622969B17')
+          expect(resp.context[:s3_host_id]).to eq('H0vUEO2f4PyWtNjgcb3TSdyHaie8j4IgnuKIW2rw0nS41rawnLDzkf+PKXmmt/uEi4bzvNMr72o=')
+        end
+
+      end
+
       describe 'endpoints' do
 
         it 'preserves custom endpoints' do
@@ -42,6 +64,19 @@ module Aws
             "http://custom.domain/path/prefix/bucket-name/key/path")
         end
 
+      end
+
+      describe 'unlinked tempfiles' do
+        it 'can put an unlinked file descriptor' do
+          data = '.' * 1024 * 1024
+          tmpfile = Tempfile.new('tmp')
+          tmpfile.write(data)
+          tmpfile.rewind
+          tmpfile.unlink
+          s3 = Client.new(stub_responses: true)
+          resp = s3.put_object(bucket:'bucket', key:'key', body: tmpfile)
+          expect(resp.context.http_request.body_contents).to eq(data)
+        end
       end
 
       describe 'closed files' do
@@ -146,6 +181,17 @@ module Aws
             'AWS4-HMAC-SHA256')
         end
 
+        it 'raises a runtime error on unsupported signature version' do
+          client = Client.new(
+            signature_version: 'v2',
+            stub_responses: true,
+            region: 'us-east-1'
+          )
+          expect {
+            client.head_object(bucket:'name', key:'key')
+          }.to raise_error(/unsupported/)
+        end
+
       end
 
       describe 'https required for sse cpk' do
@@ -174,9 +220,46 @@ module Aws
 
         it 'resolves correctly for gov-cloud' do
           s3 = Client.new(region: 'us-gov-west-1')
-          expect(s3.config.endpoint.to_s).to eq('https://s3-us-gov-west-1.amazonaws.com')
+          expect(s3.config.endpoint.to_s).to eq('https://s3.us-gov-west-1.amazonaws.com')
         end
 
+      end
+
+      describe 'invalid Expires header' do
+        %w(get_object head_object).each do |method|
+
+          it "correctly handled invalid Expires header for #{method}" do
+            s3 = Client.new
+            s3.handle(step: :send) do |context|
+              context.http_response.signal_headers(200, {'Expires' => 'abc'})
+              context.http_response.signal_done
+              Seahorse::Client::Response.new(context: context)
+            end
+            resp = s3.send(method, bucket:'b', key:'k')
+            expect(resp.expires).to be(nil)
+            expect(resp.expires_string).to eq('abc')
+          end
+
+          it 'accepts a stubbed Expires header as a Time value' do
+            now = Time.at(Time.now.to_i)
+            s3 = Client.new(stub_responses: {
+              method.to_sym => { expires: now }
+            })
+            resp = s3.send(method, bucket:'b', key:'k')
+            expect(resp.expires).to eq(now)
+            expect(resp.expires_string).to eq(now.httpdate)
+          end
+
+          it 'accepts a stubbed Expires header as String value' do
+            s3 = Client.new(stub_responses: {
+              method.to_sym => { expires_string: 'abc' }
+            })
+            resp = s3.send(method, bucket:'b', key:'k')
+            expect(resp.expires).to be(nil)
+            expect(resp.expires_string).to eq('abc')
+          end
+
+        end
       end
 
       describe '#create_bucket' do
@@ -227,6 +310,13 @@ module Aws
       end
 
       describe '#list_objects' do
+
+        it 'raises an error of the bucket name contains a forward slash' do
+          client = Client.new(stub_responses: true)
+          expect {
+            client.list_objects(bucket:'bucket-name/key-prefix')
+          }.to raise_error(ArgumentError, ":bucket option must not contain a forward-slash (/)")
+        end
 
         it 'request url encoded keys and decodes them by default' do
           client.handle(step: :send) do |context|
@@ -475,7 +565,7 @@ module Aws
         it 'returns true when the :bucket_exists waiter receives a 301' do
           stub_request(:head, "https://bucket.s3.amazonaws.com").
             to_return(:status => 301)
-          expect(client.wait_until(:bucket_exists, bucket:'bucket')).to be_truthy
+          expect(client.wait_until(:bucket_exists, bucket:'bucket')).not_to be(nil)
         end
 
       end
@@ -509,6 +599,16 @@ module Aws
           expect(resp.error).to be_kind_of(S3::Errors::InternalError)
           expect(resp.context.retries).to eq(3)
           expect(resp.data).to be(nil)
+        end
+      end
+
+      context 'metadata stubbing' do
+        it 'returns metadata from head operations' do
+          stub_client = S3::Client.new(stub_responses: {
+            head_object: { metadata: { 'custom_key' => 'abc' } }
+          })
+          resp = stub_client.head_object(bucket: "b", key: "k")
+          expect(resp.metadata).to eq({ 'custom_key' => 'abc' })
         end
       end
 

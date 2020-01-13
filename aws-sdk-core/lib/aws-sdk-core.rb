@@ -1,5 +1,7 @@
 require 'jmespath'
 require 'seahorse'
+require_relative 'aws-sdk-core/structure'
+require_relative 'aws-sdk-core/empty_structure'
 
 Seahorse::Util.irregular_inflections({
   'ARNs' => 'arns',
@@ -8,6 +10,8 @@ Seahorse::Util.irregular_inflections({
   'ElastiCache' => 'elasticache',
   'iSCSI' => 'iscsi',
   'ACLs' => 'acls',
+  'HIT' => 'hit',
+  'URL' => 'url'
   #'SSEKMS' => 'sse_kms',
 })
 
@@ -20,70 +24,227 @@ module Aws
   # services
   SERVICE_MODULE_NAMES = %w(
     ACM
+    ACMPCA
     APIGateway
+    AccessAnalyzer
+    AlexaForBusiness
+    Amplify
+    ApiGatewayManagementApi
+    ApiGatewayV2
+    AppConfig
+    AppMesh
+    AppStream
+    AppSync
+    ApplicationAutoScaling
+    ApplicationDiscoveryService
+    ApplicationInsights
+    Athena
+    AugmentedAIRuntime
     AutoScaling
+    AutoScalingPlans
+    Backup
+    Batch
+    Budgets
+    Chime
+    Cloud9
+    CloudDirectory
     CloudFormation
     CloudFront
     CloudHSM
+    CloudHSMV2
     CloudSearch
     CloudSearchDomain
     CloudTrail
     CloudWatch
     CloudWatchEvents
     CloudWatchLogs
+    CodeBuild
     CodeCommit
     CodeDeploy
+    CodeGuruProfiler
+    CodeGuruReviewer
     CodePipeline
+    CodeStar
+    CodeStarNotifications
+    CodeStarconnections
     CognitoIdentity
+    CognitoIdentityProvider
     CognitoSync
+    Comprehend
+    ComprehendMedical
+    ComputeOptimizer
     ConfigService
+    Connect
+    ConnectParticipant
+    CostExplorer
+    CostandUsageReportService
+    DAX
+    DLM
+    DataExchange
     DataPipeline
+    DataSync
+    DatabaseMigrationService
+    Detective
     DeviceFarm
     DirectConnect
     DirectoryService
+    DocDB
     DynamoDB
     DynamoDBStreams
+    EBS
     EC2
+    EC2InstanceConnect
     ECR
     ECS
     EFS
+    EKS
+    EMR
     ElastiCache
     ElasticBeanstalk
+    ElasticInference
     ElasticLoadBalancing
-    ElasticsearchService
+    ElasticLoadBalancingV2
     ElasticTranscoder
-    EMR
+    ElasticsearchService
+    EventBridge
+    FMS
+    FSx
     Firehose
+    ForecastQueryService
+    ForecastService
+    FraudDetector
+    GameLift
     Glacier
+    GlobalAccelerator
+    Glue
+    Greengrass
+    GroundStation
+    GuardDuty
+    Health
     IAM
+    Imagebuilder
     ImportExport
     Inspector
     IoT
+    IoT1ClickDevicesService
+    IoT1ClickProjects
+    IoTAnalytics
     IoTDataPlane
-    Kinesis
+    IoTEvents
+    IoTEventsData
+    IoTJobsDataPlane
+    IoTSecureTunneling
+    IoTThingsGraph
     KMS
+    Kafka
+    Kendra
+    Kinesis
+    KinesisAnalytics
+    KinesisAnalyticsV2
+    KinesisVideo
+    KinesisVideoArchivedMedia
+    KinesisVideoMedia
+    KinesisVideoSignalingChannels
+    LakeFormation
     Lambda
     LambdaPreview
+    Lex
+    LexModelBuildingService
+    LicenseManager
+    Lightsail
+    MQ
+    MTurk
     MachineLearning
+    Macie
+    ManagedBlockchain
+    MarketplaceCatalog
     MarketplaceCommerceAnalytics
+    MarketplaceEntitlementService
+    MarketplaceMetering
+    MediaConnect
+    MediaConvert
+    MediaLive
+    MediaPackage
+    MediaPackageVod
+    MediaStore
+    MediaStoreData
+    MediaTailor
+    MigrationHub
+    MigrationHubConfig
+    Mobile
+    Neptune
+    NetworkManager
     OpsWorks
+    OpsWorksCM
+    Organizations
+    Outposts
+    PI
+    Personalize
+    PersonalizeEvents
+    PersonalizeRuntime
+    Pinpoint
+    PinpointEmail
+    PinpointSMSVoice
+    Polly
+    Pricing
+    QLDB
+    QLDBSession
+    QuickSight
+    RAM
     RDS
+    RDSDataService
     Redshift
+    Rekognition
+    ResourceGroups
+    ResourceGroupsTaggingAPI
+    RoboMaker
     Route53
     Route53Domains
+    Route53Resolver
     S3
+    S3Control
     SES
-    SimpleDB
+    SESV2
+    SMS
     SNS
     SQS
     SSM
-    StorageGateway
+    SSO
+    SSOOIDC
     STS
-    Support
     SWF
+    SageMaker
+    SageMakerRuntime
+    SavingsPlans
+    Schemas
+    SecretsManager
+    SecurityHub
+    ServerlessApplicationRepository
+    ServiceCatalog
+    ServiceDiscovery
+    ServiceQuotas
+    Shield
+    Signer
+    SimpleDB
+    Snowball
+    States
+    StorageGateway
+    Support
+    Textract
+    TranscribeService
+    Transfer
+    Translate
     WAF
+    WAFRegional
+    WAFV2
+    WorkDocs
+    WorkLink
+    WorkMail
+    WorkMailMessageFlow
     WorkSpaces
+    XRay
   )
+  # end services
 
   @config = {}
   @services = {}
@@ -94,6 +255,7 @@ module Aws
   end
 
   autoload :AssumeRoleCredentials, 'aws-sdk-core/assume_role_credentials'
+  autoload :Checksums, 'aws-sdk-core/checksums'
   autoload :Client, 'aws-sdk-core/client'
   autoload :ClientStubs, 'aws-sdk-core/client_stubs'
   autoload :ClientWaiters, 'aws-sdk-core/client_waiters'
@@ -102,19 +264,22 @@ module Aws
   autoload :Credentials, 'aws-sdk-core/credentials'
   autoload :Deprecations, 'aws-sdk-core/deprecations'
   autoload :EagerLoader, 'aws-sdk-core/eager_loader'
-  autoload :EmptyStructure, 'aws-sdk-core/empty_structure'
+  autoload :ECSCredentials, 'aws-sdk-core/ecs_credentials'
   autoload :EndpointProvider, 'aws-sdk-core/endpoint_provider'
+  autoload :EndpointCache, 'aws-sdk-core/endpoint_cache'
   autoload :Errors, 'aws-sdk-core/errors'
+  autoload :IniParser, 'aws-sdk-core/ini_parser'
   autoload :InstanceProfileCredentials, 'aws-sdk-core/instance_profile_credentials'
   autoload :Json, 'aws-sdk-core/json'
   autoload :PageableResponse, 'aws-sdk-core/pageable_response'
   autoload :Pager, 'aws-sdk-core/pager'
   autoload :ParamConverter, 'aws-sdk-core/param_converter'
   autoload :ParamValidator, 'aws-sdk-core/param_validator'
+  autoload :Partitions, 'aws-sdk-core/partitions'
   autoload :RefreshingCredentials, 'aws-sdk-core/refreshing_credentials'
   autoload :Service, 'aws-sdk-core/service'
+  autoload :SharedConfig, 'aws-sdk-core/shared_config'
   autoload :SharedCredentials, 'aws-sdk-core/shared_credentials'
-  autoload :Structure, 'aws-sdk-core/structure'
   autoload :TreeHash, 'aws-sdk-core/tree_hash'
   autoload :TypeBuilder, 'aws-sdk-core/type_builder'
   autoload :VERSION, 'aws-sdk-core/version'
@@ -127,6 +292,7 @@ module Aws
     module Docs
       autoload :Builder, 'aws-sdk-core/api/docs/builder'
       autoload :ClientTypeDocumenter, 'aws-sdk-core/api/docs/client_type_documenter'
+      autoload :Crosslink, 'aws-sdk-core/api/docs/crosslink'
       autoload :DocstringProvider, 'aws-sdk-core/api/docs/docstring_provider'
       autoload :NullDocstringProvider, 'aws-sdk-core/api/docs/docstring_provider'
       autoload :OperationDocumenter, 'aws-sdk-core/api/docs/operation_documenter'
@@ -147,6 +313,7 @@ module Aws
   module Plugins
     autoload :APIGatewayHeader, 'aws-sdk-core/plugins/api_gateway_header'
     autoload :CSDConditionalSigning, 'aws-sdk-core/plugins/csd_conditional_signing'
+    autoload :CSDSwitchToPost, 'aws-sdk-core/plugins/csd_switch_to_post'
     autoload :DynamoDBExtendedRetries, 'aws-sdk-core/plugins/dynamodb_extended_retries'
     autoload :DynamoDBSimpleAttributes, 'aws-sdk-core/plugins/dynamodb_simple_attributes'
     autoload :DynamoDBCRC32Validation, 'aws-sdk-core/plugins/dynamodb_crc32_validation'
@@ -156,26 +323,42 @@ module Aws
     autoload :GlacierApiVersion, 'aws-sdk-core/plugins/glacier_api_version'
     autoload :GlacierChecksums, 'aws-sdk-core/plugins/glacier_checksums'
     autoload :GlobalConfiguration, 'aws-sdk-core/plugins/global_configuration'
+    autoload :HelpfulSocketErrors, 'aws-sdk-core/plugins/helpful_socket_errors'
+    autoload :IdempotencyToken, 'aws-sdk-core/plugins/idempotency_token'
+    autoload :JsonvalueConverter, 'aws-sdk-core/plugins/jsonvalue_converter'
+    autoload :EndpointDiscovery, 'aws-sdk-core/plugins/endpoint_discovery'
+    autoload :EndpointPattern, 'aws-sdk-core/plugins/endpoint_pattern'
     autoload :Logging, 'aws-sdk-core/plugins/logging'
     autoload :MachineLearningPredictEndpoint, 'aws-sdk-core/plugins/machine_learning_predict_endpoint'
     autoload :ParamConverter, 'aws-sdk-core/plugins/param_converter'
     autoload :ParamValidator, 'aws-sdk-core/plugins/param_validator'
+    autoload :RDSCrossRegionCopying, 'aws-sdk-core/plugins/rds_cross_region_copying'
     autoload :RegionalEndpoint, 'aws-sdk-core/plugins/regional_endpoint'
     autoload :ResponsePaging, 'aws-sdk-core/plugins/response_paging'
     autoload :RequestSigner, 'aws-sdk-core/plugins/request_signer'
     autoload :RetryErrors, 'aws-sdk-core/plugins/retry_errors'
     autoload :Route53IdFix, 'aws-sdk-core/plugins/route_53_id_fix'
+    autoload :S3ControlDns, 'aws-sdk-core/plugins/s3_control_dns'
+    autoload :S3ControlDualstack, 'aws-sdk-core/plugins/s3_control_dualstack'
+    autoload :S3ControlSigner, 'aws-sdk-core/plugins/s3_control_signer'
+    autoload :S3Accelerate, 'aws-sdk-core/plugins/s3_accelerate'
     autoload :S3BucketDns, 'aws-sdk-core/plugins/s3_bucket_dns'
+    autoload :S3BucketNameRestrictions, 'aws-sdk-core/plugins/s3_bucket_name_restrictions'
+    autoload :S3Dualstack, 'aws-sdk-core/plugins/s3_dualstack'
     autoload :S3Expect100Continue, 'aws-sdk-core/plugins/s3_expect_100_continue'
     autoload :S3GetBucketLocationFix, 'aws-sdk-core/plugins/s3_get_bucket_location_fix'
     autoload :S3Http200Errors, 'aws-sdk-core/plugins/s3_http_200_errors'
+    autoload :S3HostId, 'aws-sdk-core/plugins/s3_host_id'
+    autoload :S3IADRegionalEndpoint, 'aws-sdk-core/plugins/s3_iad_regional_endpoint'
     autoload :S3LocationConstraint, 'aws-sdk-core/plugins/s3_location_constraint'
     autoload :S3Md5s, 'aws-sdk-core/plugins/s3_md5s'
     autoload :S3Redirects, 'aws-sdk-core/plugins/s3_redirects'
     autoload :S3RequestSigner, 'aws-sdk-core/plugins/s3_request_signer'
     autoload :S3SseCpk, 'aws-sdk-core/plugins/s3_sse_cpk'
     autoload :S3UrlEncodedKeys, 'aws-sdk-core/plugins/s3_url_encoded_keys'
+    autoload :STSRegionalEndpoints, 'aws-sdk-core/plugins/sts_regional_endpoints'
     autoload :SQSQueueUrls, 'aws-sdk-core/plugins/sqs_queue_urls'
+    autoload :SQSMd5s, 'aws-sdk-core/plugins/sqs_md5s'
     autoload :StubResponses, 'aws-sdk-core/plugins/stub_responses'
     autoload :SWFReadTimeouts, 'aws-sdk-core/plugins/swf_read_timeouts'
     autoload :UserAgent, 'aws-sdk-core/plugins/user_agent'
@@ -207,6 +390,7 @@ module Aws
       autoload :Builder, 'aws-sdk-core/rest/request/builder'
       autoload :Endpoint, 'aws-sdk-core/rest/request/endpoint'
       autoload :Headers, 'aws-sdk-core/rest/request/headers'
+      autoload :QuerystringBuilder, 'aws-sdk-core/rest/request/querystring_builder'
     end
     module Response
       autoload :Body, 'aws-sdk-core/rest/response/body'
@@ -261,6 +445,12 @@ module Aws
 
   class << self
 
+    # @api private
+    def shared_config
+      enabled = ENV["AWS_SDK_CONFIG_OPT_OUT"] ? false : true
+      @shared_config ||= SharedConfig.new(config_enabled: enabled)
+    end
+
     # @return [Hash] Returns a hash of default configuration options shared
     #   by all constructed clients.
     attr_reader :config
@@ -272,6 +462,59 @@ module Aws
       else
         raise ArgumentError, 'configuration object must be a hash'
       end
+    end
+
+    # Return the partition with the given name. A partition describes
+    # the services and regions available in that partition.
+    #
+    #     aws = Aws.partition('aws')
+    #
+    #     puts "Regions available in the aws partition:\n"
+    #     aws.regions.each do |region|
+    #       puts region.name
+    #     end
+    #
+    #     puts "Services available in the aws partition:\n"
+    #     aws.services.each do |services|
+    #       puts services.name
+    #     end
+    #
+    # See {Partitions} for more information and examples.
+    #
+    # @param [String] partition_name The name of the partition to return.
+    #   Valid names include "aws", "aws-cn", and "aws-us-gov".
+    #
+    # @return [Partitions::Partition]
+    #
+    # @raise [ArgumentError] Raises an `ArgumentError` if a partition is
+    #   not found with the given name. The error message contains a list
+    #   of valid partition names.
+    def partition(partition_name)
+      Partitions.default_list.partition(partition_name)
+    end
+
+    # Return an array of partitions. A partition describes
+    # the services and regions available in that partition.
+    #
+    #     Aws.partitions.each do |partition|
+    #
+    #       puts "Regions available in #{partition.name}:\n"
+    #       partition.regions.each do |region|
+    #         puts region.name
+    #       end
+    #
+    #       puts "Services available in #{partition.name}:\n"
+    #       partition.services.each do |service|
+    #         puts service.name
+    #       end
+    #     end
+    #
+    # See {Partitions} for more information and examples.
+    #
+    # @return [Array<Partitions::Partition>] Returns an array of all
+    #   known partitions.
+    def partitions
+      Partitions.default_list.partitions
     end
 
     # The SDK ships with a ca certificate bundle to use when verifying SSL
@@ -293,6 +536,24 @@ module Aws
         '..',
         'ca-bundle.crt'
       ))
+    end
+
+    # Close any long-lived connections maintained by the SDK's internal
+    # connection pool.
+    #
+    # Applications that rely heavily on the `fork()` system call on POSIX systems
+    # should call this method in the child process directly after fork to ensure
+    # there are no race conditions between the parent process and its children
+    # for the pooled TCP connections.
+    #
+    # Child processes that make multi-threaded calls to the SDK should block on
+    # this call before beginning work.
+    #
+    # @return [nil]
+    def empty_connection_pools!
+      Seahorse::Client::NetHttp::ConnectionPool.pools.each do |pool|
+        pool.empty!
+      end
     end
 
     # Loads modules that are normally loaded with Ruby's `autoload`.
@@ -337,7 +598,7 @@ module Aws
     # each new service added after the callback is registered.
     # @api private
     def service_added(&block)
-      callback = Proc.new
+      callback = block if block_given?
       @services.each do |svc_name, (svc_module, options)|
         yield(svc_name, svc_module, options)
       end
@@ -385,10 +646,10 @@ module Aws
   service_added do |name, svc_module, options|
     if paginators = options[:paginators]
       paginators = Json.load_file(paginators) unless Hash === paginators
-      svc_module::Client.api.operations.each do |_, operation|
-        if rules = paginators['pagination'][operation.name]
-          operation[:pager] = Pager.new(rules)
-        end
+      paginators['pagination'].each do |n, rules|
+        op_name = Seahorse::Util.underscore(n)
+        operation = svc_module::Client.api.operation(op_name)
+        operation[:pager] = Pager.new(rules)
       end
     end
   end

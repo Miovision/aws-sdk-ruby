@@ -18,7 +18,7 @@ module Aws
     end
 
     it 'does not allow assigning config object to non-hash objects' do
-      expect(-> { Aws.config = [1,2,3] }).to raise_error(ArgumentError)
+      expect { Aws.config = [1,2,3] }.to raise_error(ArgumentError)
     end
 
   end
@@ -137,5 +137,20 @@ module Aws
       expect(eager_loader.loaded).to include(Aws::Xml)
     end
 
+  end
+
+  describe '.empty_connection_pools!' do
+    it 'closes any existing sessions' do
+      endpoint = "http://example.com"
+      conn_pool = Seahorse::Client::NetHttp::ConnectionPool.for({})
+      session = conn_pool.send(:start_session, endpoint)
+      conn_pool.instance_variable_get(:@pool)[endpoint] = [session]
+
+      expect(conn_pool.size).to eq(1)
+
+      Aws.empty_connection_pools!
+
+      expect(conn_pool.size).to eq(0)
+    end
   end
 end

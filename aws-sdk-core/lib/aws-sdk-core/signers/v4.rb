@@ -22,7 +22,8 @@ module Aws
         'proxy-authorization',
         'from',
         'referer',
-        'user-agent'
+        'user-agent',
+        'x-amzn-trace-id'
       ]
 
       def self.sign(context)
@@ -42,7 +43,7 @@ module Aws
       def initialize(credentials, service_name, region)
         @service_name = service_name
         @credentials = credentials.credentials
-        @region = region
+        @region = EndpointProvider.signing_region(region, service_name)
       end
 
       # @param [Seahorse::Client::Http::Request] req
@@ -217,16 +218,7 @@ module Aws
       end
 
       def hexdigest(value)
-        digest = OpenSSL::Digest::SHA256.new
-        if value.respond_to?(:read)
-          chunk = nil
-          chunk_size = 1024 * 1024 # 1 megabyte
-          digest.update(chunk) while chunk = value.read(chunk_size)
-          value.rewind
-        else
-          digest.update(value)
-        end
-        digest.hexdigest
+        Aws::Checksums.sha256_hexdigest(value)
       end
 
       def hmac(key, value)

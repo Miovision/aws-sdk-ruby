@@ -34,6 +34,15 @@ module Aws
       end
     end
 
+    # Raised when InstanceProfileCredentialsProvider or
+    # EcsCredentialsProvider fails to parse the metadata response after retries
+    class MetadataParserError < RuntimeError
+      def initialize(*args)
+        msg = "Failed to parse metadata service response."
+        super(msg)
+      end
+    end
+
     # Various plugins perform client-side checksums of responses.
     # This error indicates a checksum failed.
     class ChecksumError < RuntimeError; end
@@ -42,12 +51,91 @@ module Aws
     # credentials profile does not exist.
     class NoSuchProfileError < RuntimeError; end
 
+    # Raised when a {Service} is constructed, where Assume Role credentials are
+    # expected, and there is no source profile specified.
+    class NoSourceProfileError < RuntimeError; end
+
     # Raised when a {Service} is constructed and credentials are not
     # set, or the set credentials are empty.
     class MissingCredentialsError < RuntimeError; end
 
     # Raised when a {Service} is constructed and region is not specified.
     class MissingRegionError < ArgumentError; end
+
+    # Rasied when endpoint discovery failed for operations
+    # that requires endpoints from endpoint discovery
+    class EndpointDiscoveryError < RuntimeError
+      def initialize(*args)
+        msg = 'Endpoint discovery failed for the operation or discovered endpoint is not working, '\
+          'request will keep failing until endpoint discovery succeeds or :endpoint option is provided.'
+        super(msg)
+      end
+    end
+
+    # raised when hostLabel member is not provided
+    # at operation input when endpoint trait is available
+    # with 'hostPrefix' requirement
+    class MissingEndpointHostLabelValue < RuntimeError
+
+      def initialize(name)
+        msg = "Missing required parameter #{name} to construct"\
+          " endpoint host prefix. You can disable host prefix by"\
+          " setting :disable_host_prefix_injection to `true`."
+        super(msg)
+      end
+
+    end
+
+    # Raised when attempting to connect to an endpoint and a `SocketError`
+    # is received from the HTTP client. This error is typically the result
+    # of configuring an invalid `:region`.
+    class NoSuchEndpointError < RuntimeError
+
+      def initialize(options = {})
+        @context = options[:context]
+        @endpoint = @context.http_request.endpoint
+        @original_error = options[:original_error]
+        super(<<-MSG)
+Encountered a `SocketError` while attempting to connect to:
+
+  #{endpoint.to_s}
+
+This is typically the result of an invalid `:region` option or a
+poorly formatted `:endpoint` option.
+
+* Avoid configuring the `:endpoint` option directly. Endpoints are constructed
+  from the `:region`. The `:endpoint` option is reserved for connecting to
+  non-standard test endpoints.
+
+* Not every service is available in every region.
+
+* Never suffix region names with availability zones.
+  Use "us-east-1", not "us-east-1a"
+
+Known AWS regions include (not specific to this service):
+
+#{possible_regions}
+        MSG
+      end
+
+      attr_reader :context
+
+      attr_reader :endpoint
+
+      attr_reader :original_error
+
+      private
+
+      def possible_regions
+        Aws.partitions.inject([]) do |region_names, partition|
+          partition.regions.each do |region|
+            region_names << region.name
+          end
+          region_names
+        end.join("\n")
+      end
+
+    end
 
     # This module is mixed into another module, providing dynamic
     # error classes.  Error classes all inherit from {ServiceError}.

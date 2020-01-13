@@ -1,6 +1,7 @@
 require 'set'
 require 'time'
 require 'openssl'
+require 'cgi'
 require 'webrick/httputils'
 
 module Aws
@@ -12,6 +13,7 @@ module Aws
         acl delete cors lifecycle location logging notification partNumber
         policy requestPayment restore tagging torrent uploadId uploads
         versionId versioning versions website replication requestPayment
+        accelerate
 
         response-content-type response-content-language
         response-expires response-cache-control

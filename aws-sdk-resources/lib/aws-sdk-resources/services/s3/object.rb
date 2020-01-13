@@ -5,20 +5,37 @@ module Aws
       alias size content_length
 
       # Copies another object to this object. Use `multipart_copy: true`
-      # for large objects. This is required for objects that exceed 5GB.'
+      # for large objects. This is required for objects that exceed 5GB.
       #
-      # @param [S3::Object, String, Hash] source Where to copy object
-      #   data from. `source` must be one of the following:
+      # @param [S3::Object, S3::ObjectVersion, S3::ObjectSummary, String, Hash] source
+      #   Where to copy object data from. `source` must be one of the following:
       #
       #   * {Aws::S3::Object}
-      #   * Hash - with `:bucket` and `:key`
-      #   * String - formatted like `"source-bucket-name/source-key"`
+      #   * {Aws::S3::ObjectSummary}
+      #   * {Aws::S3::ObjectVersion}
+      #   * Hash - with `:bucket` and `:key` and optional `:version_id`
+      #   * String - formatted like `"source-bucket-name/uri-escaped-key"`
+      #     or `"source-bucket-name/uri-escaped-key?versionId=version-id"`
       #
       # @option options [Boolean] :multipart_copy (false) When `true`,
       #   the object will be copied using the multipart APIs. This is
       #   necessary for objects larger than 5GB and can provide
       #   performance improvements on large objects. Amazon S3 does
       #   not accept multipart copies for objects smaller than 5MB.
+      #
+      # @option options [Integer] :content_length Only used when
+      #   `:multipart_copy` is `true`. Passing this options avoids a HEAD
+      #   request to query the source object size.
+      #
+      # @option options [S3::Client] :copy_source_client Only used when
+      #   `:multipart_copy` is `true` and the source object is in a
+      #   different region. You do not need to specify this option
+      #   if you have provided `:content_length`.
+      #
+      # @option options [String] :copy_source_region Only used when
+      #   `:multipart_copy` is `true` and the source object is in a
+      #   different region. You do not need to specify this option
+      #   if you have provided a `:source_client` or a `:content_length`.
       #
       # @example Basic object copy
       #
@@ -89,7 +106,7 @@ module Aws
       # Copies and deletes the current object. The object will only be
       # deleted if the copy operation succeeds.
       # @param (see Object#copy_to)
-      # @options (see Object#copy_to)
+      # @option (see Object#copy_to)
       # @return [void]
       # @see Object#copy_to
       # @see Object#delete
@@ -157,7 +174,10 @@ module Aws
       #
       # @option params [Integer] :expires_in (900) Number of seconds before
       #   the pre-signed URL expires. This may not exceed one week (604800
-      #   seconds).
+      #   seconds). Note that the pre-signed URL is also only valid as long as
+      #   credentials used to sign it are. For example, when using IAM roles,
+      #   temporary tokens generated for signing also have a default expiration
+      #   which will affect the effective expiration of the pre-signed URL.
       #
       # @raise [ArgumentError] Raised if `:expires_in` exceeds one week
       #   (604800 seconds).
@@ -236,13 +256,46 @@ module Aws
       #   without any errors.
       #
       def upload_file(source, options = {}, &block)
+        uploading_options = options.dup
         uploader = FileUploader.new(
-          multipart_threshold: options.delete(:multipart_threshold),
+          multipart_threshold: uploading_options.delete(:multipart_threshold),
           client: client)
-        uploader.upload(source, options.merge(bucket: bucket_name, key: key), &block)
+        uploader.upload(source, uploading_options.merge(bucket: bucket_name, key: key), &block)
         true
       end
-
+     
+      # Downloads a file in S3 to a path on disk.
+      #
+      #     # small files (< 5MB) are downloaded in a single API call
+      #     obj.download_file('/path/to/file')
+      #
+      # Files larger than 5MB are downloaded using multipart method
+      #
+      #     # large files are split into parts
+      #     # and the parts are downloaded in parallel
+      #     obj.download_file('/path/to/very_large_file')
+      # 
+      # @param [String] destination Where to download the file to
+      #
+      # @option options [String] mode `auto`, `single_request`, `get_range`
+      #  `single_request` mode forces only 1 GET request is made in download,
+      #  `get_range` mode allows `chunk_size` parameter to configured in
+      #  customizing each range size in multipart_download,
+      #  By default, `auto` mode is enabled, which performs multipart_download
+      #
+      # @option options [String] chunk_size required in get_range mode
+      #
+      # @option options [String] thread_count Customize threads used in multipart
+      #   download, if not provided, 10 is default value
+      #
+      # @return [Boolean] Returns `true` when the file is downloaded
+      #   without any errors.
+      def download_file(destination, options = {})
+        downloader = FileDownloader.new(client: client)
+        downloader.download(
+          destination, options.merge(bucket: bucket_name, key: key))
+        true
+      end
     end
   end
 end

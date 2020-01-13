@@ -531,7 +531,7 @@ module Aws
       # @return [self]
       def server_side_encryption_customer_key(value)
         field_name = 'x-amz-server-side-encryption-customer-key'
-        with(field_name, value)
+        with(field_name, base64(value))
         with(field_name + '-MD5', base64(OpenSSL::Digest::MD5.digest(value)))
       end
 
@@ -584,6 +584,10 @@ module Aws
           url.host = @bucket_name + '.' + url.host
         else
           url.path = '/' + @bucket_name
+        end
+        if @bucket_region == 'us-east-1'
+          # keep legacy behavior by default
+          url.host = Plugins::S3IADRegionalEndpoint.legacy_host(url.host)
         end
         url.to_s
       end
